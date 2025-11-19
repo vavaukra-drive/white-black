@@ -1,6 +1,6 @@
 // VariableProximity.tsx
 // VariableProximity.tsx (Aggiornato)
-import { forwardRef, useMemo, useRef, useEffect, useCallback } from 'react';
+import { forwardRef, useMemo, useRef, useEffect, useCallback, useState } from 'react';
 
 // Importa i tipi specifici da React e altri moduli usando 'type'
 import type { 
@@ -9,7 +9,7 @@ import type {
   HTMLAttributes 
 } from 'react';
 
-import { motion } from 'framer-motion';
+import { motion, useMotionValueEvent, type MotionValue } from 'framer-motion';
 
 // Hook per l'animazione al frame
 function useAnimationFrame(callback: () => void) {
@@ -68,7 +68,8 @@ interface VariableProximityProps extends HTMLAttributes<HTMLSpanElement> {
   falloff?: 'linear' | 'exponential' | 'gaussian';
   className?: string;
   style?: CSSProperties;
-  wordIndex: number; 
+  wordIndex: number;
+  scrollProgress?: number | MotionValue<number>; // 0 = visibile, 1 = scompaginato (lettere vanno verso il basso)
 }
 
 const VariableProximity = forwardRef<HTMLSpanElement, VariableProximityProps>((props, ref) => {
@@ -82,12 +83,28 @@ const VariableProximity = forwardRef<HTMLSpanElement, VariableProximityProps>((p
     className = '',
     style,
     wordIndex,
+    scrollProgress,
     ...restProps
   } = props;
 
   const letterRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const mousePositionRef = useMousePositionRef(containerRef);
   const lastPositionRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
+
+  // Gestisce scrollProgress sia come numero che come MotionValue
+  const [scrollProgressValue, setScrollProgressValue] = useState<number | undefined>(
+    typeof scrollProgress === 'number' ? scrollProgress : undefined
+  );
+
+  // Sincronizza MotionValue con lo stato locale
+  useEffect(() => {
+    if (scrollProgress && typeof scrollProgress !== 'number') {
+      const unsubscribe = (scrollProgress as MotionValue<number>).on('change', (latest) => {
+        setScrollProgressValue(latest);
+      });
+      return unsubscribe;
+    }
+  }, [scrollProgress]);
 
   const parsedSettings = useMemo(() => {
     const parseSettings = (settingsStr: string) =>
@@ -198,11 +215,17 @@ const VariableProximity = forwardRef<HTMLSpanElement, VariableProximityProps>((p
           {/* Animazione di entrata "Split Text" con Framer Motion */}
           <motion.span
             initial={{ y: "100%", opacity: 0 }}
-            animate={{ y: "0%", opacity: 1 }}
+            animate={{ 
+              y: scrollProgressValue !== undefined 
+                ? `${scrollProgressValue * 100}%` // Se scrollProgress è definito, anima verso il basso
+                : "0%", 
+              opacity: scrollProgressValue !== undefined 
+                ? 1 - scrollProgressValue 
+                : 1 
+            }}
             transition={{
-              duration: 0.8,
-              // Delay concatenato: 0.6s di delay iniziale + delay sequenziale tra parole
-              delay: 0.6 + wordIndex * 0.15 + props.wordIndex * 0.1, 
+              duration: scrollProgressValue !== undefined ? 0 : 0.8, // Disabilita transizione se controllato da scroll
+              delay: scrollProgressValue !== undefined ? 0 : 0.6 + wordIndex * 0.15 + props.wordIndex * 0.1, 
               ease: [0.22, 1, 0.36, 1],
             }}
             className="inline-block"
