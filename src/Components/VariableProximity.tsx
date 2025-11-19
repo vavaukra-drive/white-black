@@ -9,7 +9,7 @@ import type {
   HTMLAttributes 
 } from 'react';
 
-import { motion, useMotionValueEvent, type MotionValue } from 'framer-motion';
+import { motion, type MotionValue } from 'framer-motion';
 
 // Hook per l'animazione al frame
 function useAnimationFrame(callback: () => void) {
